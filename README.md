@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Emotion Detection API — Backend
 
 FastAPI backend that serves your `text_emotion.pkl` model.
@@ -42,3 +43,7 @@ curl -X POST https://your-app.onrender.com/predict \
   -H "Content-Type: application/json" \
   -d '{"text": "I am so happy today!"}'
 ```
+=======
+# emotion-backend
+Emotion Detection API
+>>>>>>> e153e9e27baf20e0bde4abfa71990aa08bef3128

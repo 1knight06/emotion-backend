@@ -46,6 +46,9 @@ class EmotionResult(BaseModel):
     all_emotions: dict
     text_preview: str
 
+    class Config:
+        orm_mode = True
+
 def clean_text(text: str) -> str:
     text = text.strip()
     text = re.sub(r'https?://\S+|www\.\S+', '', text)

@@ -52,7 +52,7 @@ def clean_text(text: str) -> str:
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
-def run_prediction(text: str) -> EmotionResult:
+def run_prediction(text: str) -> dict:
     if model is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
     text = clean_text(text)
@@ -61,23 +61,23 @@ def run_prediction(text: str) -> EmotionResult:
     if len(text) > 2000:
         text = text[:2000]
     try:
-        prediction  = model.predict([text])[0]
-        proba       = model.predict_proba([text])[0]
-        classes     = model.classes_
-        confidence  = float(np.max(proba))
+        prediction   = model.predict([text])[0]
+        proba        = model.predict_proba([text])[0]
+        classes      = model.classes_
+        confidence   = float(np.max(proba))
         all_emotions = {
             cls: round(float(p), 4)
             for cls, p in zip(classes, proba)
         }
         meta = EMOTION_META.get(prediction.lower(), {"emoji": "😶", "color": "#333333"})
-        return EmotionResult(
-            emotion=prediction,
-            confidence=round(confidence, 4),
-            emoji=meta["emoji"],
-            color=meta["color"],
-            all_emotions=all_emotions,
-            text_preview=text[:120] + ("..." if len(text) > 120 else ""),
-        )
+        return {
+            "emotion": str(prediction),
+            "confidence": round(confidence, 4),
+            "emoji": meta["emoji"],
+            "color": meta["color"],
+            "all_emotions": all_emotions,
+            "text_preview": text[:120] + ("..." if len(text) > 120 else ""),
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

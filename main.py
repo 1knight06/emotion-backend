@@ -38,14 +38,6 @@ EMOTION_META = {
 class TextInput(BaseModel):
     text: str
 
-class EmotionResult(BaseModel):
-    emotion: str
-    confidence: float
-    emoji: str
-    color: str
-    all_emotions: dict
-    text_preview: str
-
 def clean_text(text: str) -> str:
     text = text.strip()
     text = re.sub(r'https?://\S+|www\.\S+', '', text)
@@ -69,7 +61,10 @@ def run_prediction(text: str) -> dict:
             cls: round(float(p), 4)
             for cls, p in zip(classes, proba)
         }
-        meta = EMOTION_META.get(prediction.lower(), {"emoji": "😶", "color": "#333333"})
+        meta = EMOTION_META.get(
+            prediction.lower(),
+            {"emoji": "😶", "color": "#333333"}
+        )
         return {
             "emotion": str(prediction),
             "confidence": round(confidence, 4),
@@ -92,7 +87,7 @@ def predict(data: TextInput):
 @app.post("/predict-file")
 async def predict_file(file: UploadFile = File(...)):
     if not file.filename.endswith(".txt"):
-        raise HTTPException(status_code=400, detail="Only .txt files are supported")
+        raise HTTPException(status_code=400, detail="Only .txt files")
     raw = await file.read()
     try:
         content = raw.decode("utf-8")
@@ -101,8 +96,7 @@ async def predict_file(file: UploadFile = File(...)):
     paragraphs = [p.strip() for p in re.split(r"\n{2,}", content) if p.strip()]
     if not paragraphs:
         raise HTTPException(status_code=400, detail="File appears empty")
-    paragraphs = paragraphs[:20]
-    return [run_prediction(p) for p in paragraphs]
+    return [run_prediction(p) for p in paragraphs[:20]]
 
 @app.get("/emotions/meta")
 def emotion_meta():

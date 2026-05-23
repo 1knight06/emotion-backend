@@ -46,9 +46,6 @@ class EmotionResult(BaseModel):
     all_emotions: dict
     text_preview: str
 
-    class Config:
-        orm_mode = True
-
 def clean_text(text: str) -> str:
     text = text.strip()
     text = re.sub(r'https?://\S+|www\.\S+', '', text)
@@ -88,11 +85,11 @@ def run_prediction(text: str) -> EmotionResult:
 def health():
     return {"status": "ok", "model_loaded": model is not None}
 
-@app.post("/predict", response_model=EmotionResult)
+@app.post("/predict")
 def predict(data: TextInput):
     return run_prediction(data.text)
 
-@app.post("/predict-file", response_model=list[EmotionResult])
+@app.post("/predict-file")
 async def predict_file(file: UploadFile = File(...)):
     if not file.filename.endswith(".txt"):
         raise HTTPException(status_code=400, detail="Only .txt files are supported")

@@ -1,7 +1,6 @@
-fastapi==0.95.2
-uvicorn==0.30.0
-python-multipart==0.0.9
+flask==3.1.0
+gunicorn==23.0.0
 joblib==1.4.2
 scikit-learn==1.7.2
 numpy==2.2.0
-pydantic==1.10.21
+flask-cors==5.0.0

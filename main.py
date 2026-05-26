@@ -6,7 +6,7 @@ import os
 import re
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins="*", supports_credentials=False)
 
 MODEL_PATH = os.environ.get("MODEL_PATH", "text_emotion.pkl")
 
@@ -34,54 +34,62 @@ def clean_text(text):
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
-def run_prediction(text):
-    if model is None:
-        return None, "Model not loaded"
-    text = clean_text(text)
-    if len(text) < 3:
-        return None, "Text too short"
-    if len(text) > 2000:
-        text = text[:2000]
-    try:
-        prediction   = model.predict([text])[0]
-        proba        = model.predict_proba([text])[0]
-        classes      = model.classes_
-        confidence   = float(np.max(proba))
-        all_emotions = {
-            cls: round(float(p), 4)
-            for cls, p in zip(classes, proba)
-        }
-        meta = EMOTION_META.get(
-            prediction.lower(),
-            {"emoji": "😶", "color": "#333333"}
-        )
-        return {
-            "emotion": str(prediction),
-            "confidence": round(confidence, 4),
-            "emoji": meta["emoji"],
-            "color": meta["color"],
-            "all_emotions": all_emotions,
-            "text_preview": text[:120] + ("..." if len(text) > 120 else ""),
-        }, None
-    except Exception as e:
-        return None, str(e)
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
 
-@app.route("/health", methods=["GET"])
+@app.route("/health", methods=["GET", "OPTIONS"])
 def health():
     return jsonify({"status": "ok", "model_loaded": model is not None})
 
-@app.route("/predict", methods=["POST"])
+@app.route("/predict", methods=["POST", "OPTIONS"])
 def predict():
-    data = request.get_json()
-    if not data or "text" not in data:
-        return jsonify({"error": "No text provided"}), 400
-    result, error = run_prediction(data["text"])
-    if error:
-        return jsonify({"error": error}), 500
-    return jsonify(result)
+    if request.method == "OPTIONS":
+        return jsonify({}), 200
+    try:
+        data = request.get_json(force=True, silent=True)
+        if not data or "text" not in data:
+            return jsonify({"error": "No text provided"}), 400
 
-@app.route("/predict-file", methods=["POST"])
+        text = clean_text(str(data["text"]))
+        if len(text) < 3:
+            return jsonify({"error": "Text too short"}), 400
+        if len(text) > 2000:
+            text = text[:2000]
+
+        if model is None:
+            return jsonify({"error": "Model not loaded"}), 503
+
+        prediction  = model.predict([text])[0]
+        proba       = model.predict_proba([text])[0]
+        classes     = model.classes_
+        confidence  = float(np.max(proba))
+        all_emotions = {
+            str(cls): round(float(p), 4)
+            for cls, p in zip(classes, proba)
+        }
+        meta = EMOTION_META.get(str(prediction).lower(), {"emoji": "😶", "color": "#333333"})
+
+        result = {
+            "emotion": str(prediction),
+            "confidence": round(confidence, 4),
+            "emoji": str(meta["emoji"]),
+            "color": str(meta["color"]),
+            "all_emotions": all_emotions,
+            "text_preview": text[:120] + ("..." if len(text) > 120 else ""),
+        }
+        return jsonify(result)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/predict-file", methods=["POST", "OPTIONS"])
 def predict_file():
+    if request.method == "OPTIONS":
+        return jsonify({}), 200
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
     file = request.files["file"]
@@ -96,9 +104,26 @@ def predict_file():
         return jsonify({"error": "File appears empty"}), 400
     results = []
     for p in paragraphs[:20]:
-        result, error = run_prediction(p)
-        if result:
-            results.append(result)
+        try:
+            text = clean_text(p)
+            if len(text) < 3:
+                continue
+            prediction  = model.predict([text])[0]
+            proba       = model.predict_proba([text])[0]
+            classes     = model.classes_
+            confidence  = float(np.max(proba))
+            all_emotions = {str(cls): round(float(p2), 4) for cls, p2 in zip(classes, proba)}
+            meta = EMOTION_META.get(str(prediction).lower(), {"emoji": "😶", "color": "#333333"})
+            results.append({
+                "emotion": str(prediction),
+                "confidence": round(confidence, 4),
+                "emoji": str(meta["emoji"]),
+                "color": str(meta["color"]),
+                "all_emotions": all_emotions,
+                "text_preview": text[:120],
+            })
+        except Exception:
+            continue
     return jsonify(results)
 
 @app.route("/emotions/meta", methods=["GET"])
@@ -106,4 +131,5 @@ def emotion_meta():
     return jsonify(EMOTION_META)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port)
